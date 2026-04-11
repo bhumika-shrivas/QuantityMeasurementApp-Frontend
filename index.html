@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quantity Measurement App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">Toggle Theme</button>
+
+  <main class="page-shell">
+    <section class="auth-shell">
+      <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <div class="modal-header">
+          <p class="eyebrow">Quantity Measurement App</p>
+          <h1 id="authTitle">Welcome back</h1>
+        </div>
+
+        <div class="mode-tabs" role="tablist" aria-label="Authentication mode">
+          <button class="mode-tab is-active" type="button" id="loginTab" role="tab" aria-selected="true">Login</button>
+          <button class="mode-tab" type="button" id="signupTab" role="tab" aria-selected="false">Sign Up</button>
+        </div>
+
+        <form class="auth-form" id="authForm" novalidate>
+          <div class="field-group">
+            <label for="nameField" id="nameLabel">Email</label>
+            <input id="nameField" name="identifier" type="text" autocomplete="username" placeholder="you@example.com" required>
+            <p class="field-error" id="nameError" aria-live="polite"></p>
+          </div>
+
+          <div class="field-group">
+            <label for="passwordField">Password</label>
+            <div class="input-with-button">
+              <input id="passwordField" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+              <button class="small-button" type="button" id="togglePassword">Show</button>
+            </div>
+            <p class="field-error" id="passwordError" aria-live="polite"></p>
+          </div>
+
+          <div class="field-group signup-only is-hidden" id="confirmGroup">
+            <label for="confirmField">Confirm Password</label>
+            <input id="confirmField" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Repeat your password">
+            <p class="field-error" id="confirmError" aria-live="polite"></p>
+          </div>
+
+          <div class="form-row signup-only is-hidden" id="signupExtras">
+            <label class="check-row" for="termsField">
+              <input id="termsField" name="terms" type="checkbox">
+              <span>I agree to the terms and privacy policy</span>
+            </label>
+            <p class="field-error" id="termsError" aria-live="polite"></p>
+          </div>
+
+          <div class="form-row login-only" id="loginExtras">
+            <label class="check-row" for="rememberField">
+              <input id="rememberField" name="remember" type="checkbox">
+              <span>Remember me</span>
+            </label>
+            <button class="link-button" type="button" id="forgotPassword">Forgot password?</button>
+          </div>
+
+          <button class="primary-button submit-button" type="submit" id="submitButton">Login</button>
+        </form>
+
+      </div>
+    </section>
+  </main>
+
+  <div class="toast is-hidden" id="toast" role="status" aria-live="polite"></div>
+
+  <div class="help-popup is-hidden" id="helpPopup" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="help-card">
+      <h3 id="helpTitle">Password help</h3>
+      <p>Use at least 8 characters. For a strong sign-up, include uppercase, lowercase, and a number.</p>
+      <button class="primary-button" type="button" id="closeHelp">Got it</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
