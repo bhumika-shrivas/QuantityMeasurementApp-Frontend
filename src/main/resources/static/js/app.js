@@ -192,7 +192,7 @@ const API = {
 const MockAPI = {
   seed() {
     return {
-      nextUserId: 4,
+      nextUserId: 2,
       nextMeasurementId: 17,
       users: [
         {
@@ -204,26 +204,6 @@ const MockAPI = {
           roles: ['ROLE_ADMIN', 'ROLE_USER'],
           createdAt: '2026-01-08T09:15:00',
           password: 'Admin@123'
-        },
-        {
-          id: 2,
-          username: 'sarah',
-          email: 'sarah@quantimeasure.app',
-          fullName: 'Sarah Stone',
-          provider: 'GOOGLE',
-          roles: ['ROLE_USER'],
-          createdAt: '2026-02-01T14:20:00',
-          password: 'User@123'
-        },
-        {
-          id: 3,
-          username: 'mike',
-          email: 'mike@quantimeasure.app',
-          fullName: 'Mike Turner',
-          provider: 'LOCAL',
-          roles: ['ROLE_USER'],
-          createdAt: '2026-02-11T08:30:00',
-          password: 'User@123'
         }
       ],
       measurements: [

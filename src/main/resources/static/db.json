@@ -8,24 +8,6 @@
       "provider": "LOCAL",
       "roles": ["ROLE_ADMIN", "ROLE_USER"],
       "createdAt": "2026-01-08T09:15:00"
-    },
-    {
-      "id": 2,
-      "username": "sarah",
-      "email": "sarah@quantimeasure.app",
-      "fullName": "Sarah Stone",
-      "provider": "GOOGLE",
-      "roles": ["ROLE_USER"],
-      "createdAt": "2026-02-01T14:20:00"
-    },
-    {
-      "id": 3,
-      "username": "mike",
-      "email": "mike@quantimeasure.app",
-      "fullName": "Mike Turner",
-      "provider": "LOCAL",
-      "roles": ["ROLE_USER"],
-      "createdAt": "2026-02-11T08:30:00"
     }
   ],
   "quantity_measurements": [
