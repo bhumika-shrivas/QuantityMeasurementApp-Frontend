@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quantity Measurement App | Sign In</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body data-page="index">
+    <div class="orb one"></div>
+    <div class="orb two"></div>
+
+    <button id="themeFloatBtn" data-theme-btn class="btn btn-ghost float-theme" aria-label="Toggle theme" title="Toggle theme"></button>
+
+    <main id="authShell" class="auth-shell">
+      <section class="card auth-card reveal d1">
+        <div class="brand" style="justify-content:center; width:100%;">
+          <span class="brand-mark">Q</span>
+          <span class="brand-text" style="font-size:1.2rem;">Quantity Measurement App</span>
+        </div>
+
+        <div class="auth-tabs reveal d2">
+          <button id="signInTab" class="auth-tab active" type="button">Sign In</button>
+          <button id="registerTab" class="auth-tab" type="button">Register</button>
+        </div>
+
+        <form id="signInForm" class="auth-form reveal d3">
+          <div id="signInError" class="form-error"></div>
+          <div class="field">
+            <label for="loginEmail">Email</label>
+            <input id="loginEmail" type="email" name="email" required />
+          </div>
+          <div class="field">
+            <label for="loginPassword">Password</label>
+            <input id="loginPassword" type="password" name="password" required />
+          </div>
+          <label style="display:flex; align-items:center; gap:0.45rem; font-size:0.88rem; text-transform:none; letter-spacing:0;">
+            <input id="rememberMe" type="checkbox" name="rememberMe" checked style="width:auto;" />
+            Remember me on this device
+          </label>
+          <button id="signInSubmit" class="btn btn-primary" type="submit">Sign In</button>
+        </form>
+
+        <form id="registerForm" class="auth-form hidden">
+          <div id="registerError" class="form-error"></div>
+          <div class="field">
+            <label for="registerName">Name</label>
+            <input id="registerName" type="text" name="fullName" placeholder="Your name" />
+          </div>
+          <div class="field">
+            <label for="registerEmail">Email</label>
+            <input id="registerEmail" type="email" name="email" required />
+          </div>
+          <div class="field">
+            <label for="registerPassword">Password</label>
+            <input id="registerPassword" type="password" name="password" required />
+          </div>
+          <button id="registerSubmit" class="btn btn-primary" type="submit">Register</button>
+        </form>
+
+        <button id="googleBtn" class="btn btn-ghost reveal d4" type="button" style="width:100%; margin-top:0.95rem;">
+          Continue with Google
+        </button>
+      </section>
+    </main>
+
+    <section id="appShell" class="hidden">
+      <header id="navbarMount"></header>
+      <main class="page-wrap">
+        <section class="section-title reveal d1">
+          <div>
+            <h1 id="welcomeText">Operations</h1>
+          </div>
+        </section>
+
+        <section class="card reveal d2" style="padding:1rem;">
+          <div class="tabs" style="margin-bottom:1rem;">
+            <button class="btn btn-ghost tab-btn active" data-op="compare" type="button">Compare</button>
+            <button class="btn btn-ghost tab-btn" data-op="add" type="button">Add</button>
+            <button class="btn btn-ghost tab-btn" data-op="subtract" type="button">Subtract</button>
+            <button class="btn btn-ghost tab-btn" data-op="divide" type="button">Divide</button>
+            <button class="btn btn-ghost tab-btn" data-op="convert" type="button">Convert</button>
+          </div>
+
+          <form id="opForm" class="reveal d3">
+            <div class="split-grid">
+              <div class="card" style="padding:0.85rem;">
+                <h3 id="leftTitle">First Quantity</h3>
+                <div class="field" style="margin-top:0.8rem;">
+                  <label for="firstValue">Value</label>
+                  <input id="firstValue" type="number" step="any" required />
+                </div>
+                <div class="field" style="margin-top:0.7rem;">
+                  <label for="firstType">Measurement Type</label>
+                  <select id="firstType"></select>
+                </div>
+                <div class="field" style="margin-top:0.7rem;">
+                  <label for="firstUnit">Unit</label>
+                  <select id="firstUnit"></select>
+                </div>
+              </div>
+
+              <div class="card" style="padding:0.85rem;">
+                <h3 id="rightTitle">Second Quantity</h3>
+                <div id="secondValueWrap" class="field" style="margin-top:0.8rem;">
+                  <label for="secondValue">Value</label>
+                  <input id="secondValue" type="number" step="any" required />
+                </div>
+                <div class="field" style="margin-top:0.7rem;">
+                  <label for="secondType">Measurement Type</label>
+                  <select id="secondType"></select>
+                </div>
+                <div class="field" style="margin-top:0.7rem;">
+                  <label for="secondUnit">Unit</label>
+                  <select id="secondUnit"></select>
+                </div>
+              </div>
+            </div>
+
+            <div class="center" style="margin-top:1rem;">
+              <button id="calculateBtn" class="btn btn-primary" type="submit">Calculate</button>
+            </div>
+          </form>
+
+          <div id="resultBox" class="result-box">
+            <div id="resultValue" class="result-value">--</div>
+            <div id="resultMeta" class="mono muted" style="margin-top:0.35rem;"></div>
+          </div>
+        </section>
+      </main>
+    </section>
+
+    <div id="successPopup" class="popup-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="successTitle">
+      <div class="popup-card">
+        <h3 id="successTitle">Registration Complete</h3>
+        <p id="successText">Your account is ready.</p>
+        <button id="successOkBtn" class="btn btn-primary" type="button">Continue</button>
+      </div>
+    </div>
+
+    <script src="js/app.js"></script>
+  </body>
+</html>

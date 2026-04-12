@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quantity Measurement App | Admin</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body data-page="admin">
+    <header id="navbarMount"></header>
+
+    <main class="page-wrap">
+      <section class="section-title reveal d1">
+        <div>
+          <h1>Admin Panel</h1>
+          <p>User and role management overview.</p>
+        </div>
+      </section>
+
+      <section class="grid-4 reveal d2" style="margin-top:1rem;">
+        <article class="card stat-card">
+          <p>Total Users</p>
+          <div id="adminTotal" class="stat-num">0</div>
+        </article>
+      </section>
+
+      <section class="card reveal d3" style="padding:1rem; margin-top:1rem;">
+        <p id="adminDenied" class="badge badge-error hidden" style="margin-bottom:0.8rem;">Access denied.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>User</th>
+                <th>Email</th>
+                <th>Provider</th>
+                <th>Roles</th>
+                <th>Joined</th>
+              </tr>
+            </thead>
+            <tbody id="adminRows">
+              <tr>
+                <td colspan="6" class="center muted">Loading users...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="js/app.js"></script>
+  </body>
+</html>

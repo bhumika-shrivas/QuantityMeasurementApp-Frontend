@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quantity Measurement App | Profile</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body data-page="profile">
+    <header id="navbarMount"></header>
+
+    <main class="page-wrap" style="display:grid; place-items:center;">
+      <section class="card reveal d2" style="width:min(500px,100%); padding:1.2rem;">
+        <div style="display:grid; place-items:center; gap:0.45rem;">
+          <div id="profileAvatar" class="avatar" style="width:92px; height:92px; font-size:2rem; border-radius:999px;">U</div>
+          <h1 id="profileName">User Name</h1>
+          <p id="profileHandle" class="mono">@username</p>
+          <div id="profileBadges" style="display:flex; flex-wrap:wrap; justify-content:center; gap:0.4rem;"></div>
+        </div>
+
+        <div class="card" style="padding:0.85rem; margin-top:1rem;">
+          <div style="display:grid; gap:0.55rem;">
+            <div style="display:flex; justify-content:space-between; gap:0.5rem;"><span class="muted">Email</span><strong id="detailEmail">-</strong></div>
+            <div style="display:flex; justify-content:space-between; gap:0.5rem;"><span class="muted">Username</span><strong id="detailUsername">-</strong></div>
+            <div style="display:flex; justify-content:space-between; gap:0.5rem;"><span class="muted">Auth Provider</span><strong id="detailProvider">-</strong></div>
+            <div style="display:flex; justify-content:space-between; gap:0.5rem;"><span class="muted">Member Since</span><strong id="detailCreated">-</strong></div>
+            <div style="display:flex; justify-content:space-between; gap:0.5rem;"><span class="muted">Status</span><strong id="detailStatus">-</strong></div>
+          </div>
+        </div>
+
+        <button id="profileLogout" class="btn btn-danger" type="button" style="width:100%; margin-top:1rem;">Sign Out</button>
+      </section>
+    </main>
+
+    <script src="js/app.js"></script>
+  </body>
+</html>
