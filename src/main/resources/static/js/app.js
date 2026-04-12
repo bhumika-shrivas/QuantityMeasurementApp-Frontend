@@ -114,7 +114,7 @@ const Auth = {
   },
   requireAdmin() {
     if (!this.isAdmin()) {
-      window.location.href = 'dashboard.html';
+      window.location.href = 'index.html';
       return false;
     }
     return true;
@@ -580,7 +580,7 @@ const Utils = {
       roles: search.get('roles') ? search.get('roles').split(',') : ['ROLE_USER']
     };
     Auth.save(authData);
-    window.location.href = 'dashboard.html';
+    window.location.href = 'index.html';
   }
 };
 
@@ -672,17 +672,13 @@ function renderNavbar(active) {
   const initial = username.charAt(0).toUpperCase();
 
   const links = [
-    { href: 'operations.html', key: 'operations', label: 'Operations' }
+    { href: 'index.html', key: 'operations', label: 'Operations' }
   ];
-
-  if (Auth.isAdmin()) {
-    links.push({ href: 'admin.html', key: 'admin', label: 'Admin' });
-  }
 
   mount.innerHTML = `
     <nav class="navbar">
       <div class="navbar-inner">
-        <a class="brand" href="dashboard.html">
+        <a class="brand" href="index.html">
           <span class="brand-mark">Q</span>
           <span class="brand-text">Quantity Measurement App</span>
         </a>
@@ -703,7 +699,6 @@ function renderNavbar(active) {
     </nav>
   `;
 
-  document.getElementById('navThemeBtn')?.addEventListener('click', () => Theme.toggle());
   document.getElementById('logoutBtn')?.addEventListener('click', () => Auth.logout());
 }
 
@@ -752,8 +747,6 @@ async function initIndex() {
   }
 
   showAuthShell();
-
-  document.getElementById('themeFloatBtn')?.addEventListener('click', () => Theme.toggle());
 
   const signInTab = document.getElementById('signInTab');
   const registerTab = document.getElementById('registerTab');
@@ -1115,7 +1108,7 @@ async function initProfile() {
 async function initAdmin() {
   if (!Auth.requireAuth()) return;
   if (!Auth.isAdmin()) {
-    window.location.href = 'dashboard.html';
+    window.location.href = 'index.html';
     return;
   }
 
@@ -1169,6 +1162,13 @@ async function initAdmin() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (enforceBackendOrigin()) return;
+
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-theme-btn]');
+    if (!btn) return;
+    event.preventDefault();
+    Theme.toggle();
+  });
 
   if (pageName !== 'index.html') {
     window.location.href = 'index.html';
