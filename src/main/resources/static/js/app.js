@@ -60,9 +60,14 @@ const Theme = {
     document.querySelectorAll('[data-theme-btn]').forEach((btn) => {
       const current = document.documentElement.getAttribute('data-theme') || 'dark';
       btn.classList.add('theme-icon-btn');
+      btn.setAttribute('type', 'button');
       btn.innerHTML = Theme.iconSvg();
       btn.setAttribute('aria-label', current === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
       btn.setAttribute('title', current === 'dark' ? 'Light mode' : 'Dark mode');
+      btn.onclick = (event) => {
+        event.preventDefault();
+        Theme.toggle();
+      };
     });
   }
 };
