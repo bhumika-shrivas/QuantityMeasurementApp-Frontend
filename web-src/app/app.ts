@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 type MeasurementType = 'LengthUnit' | 'WeightUnit' | 'VolumeUnit' | 'TemperatureUnit';
 type Operation = 'compare' | 'add' | 'subtract' | 'divide' | 'convert';
 type ThemeMode = 'light' | 'dark';
+type AppSection = 'operations' | 'history' | 'users';
 
 interface AuthSession {
   token: string;
@@ -92,6 +93,7 @@ export class AppComponent implements OnInit {
 
   themeMode: ThemeMode = 'light';
   isLoggedIn = false;
+  activeSection: AppSection = 'operations';
   authTab: 'signin' | 'register' = 'signin';
 
   signInModel = {
@@ -143,6 +145,10 @@ export class AppComponent implements OnInit {
   private toastCounter = 0;
 
   currentUser: AuthSession | null = null;
+  historyFilter: 'ALL' | 'ERRORS' | 'COMPARE' | 'ADD' | 'SUBTRACT' | 'DIVIDE' | 'CONVERT' = 'ALL';
+  historySearch = '';
+  historyRows: MeasurementRecord[] = [];
+  users: Omit<UserRecord, 'password'>[] = [];
 
   ngOnInit(): void {
     this.initTheme();
@@ -153,8 +159,14 @@ export class AppComponent implements OnInit {
     this.seedStore();
 
     if (this.isLoggedIn) {
+      this.refreshAppData();
       this.addToast('Welcome back.', 'success');
     }
+  }
+
+  setSection(section: AppSection): void {
+    this.activeSection = section;
+    this.refreshAppData();
   }
 
   setAuthTab(tab: 'signin' | 'register'): void {
@@ -180,6 +192,47 @@ export class AppComponent implements OnInit {
   get welcomeText(): string {
     const fullName = this.currentUser?.fullName || this.currentUser?.username || 'User';
     return `Welcome ${fullName}`;
+  }
+
+  get isAdmin(): boolean {
+    const roles = this.currentUser?.roles || [];
+    return roles.includes('ROLE_ADMIN') || roles.includes('ADMIN');
+  }
+
+  get totalOperations(): number {
+    return this.historyRows.length;
+  }
+
+  get totalErrors(): number {
+    return this.historyRows.filter((row) => row.error).length;
+  }
+
+  get recentOperations(): MeasurementRecord[] {
+    return this.historyRows.slice(0, 5);
+  }
+
+  get filteredHistoryRows(): MeasurementRecord[] {
+    const searchText = this.historySearch.toLowerCase().trim();
+    return this.historyRows.filter((row) => {
+      const byFilter =
+        this.historyFilter === 'ALL'
+          ? true
+          : this.historyFilter === 'ERRORS'
+            ? row.error
+            : row.operation === this.historyFilter;
+
+      if (!byFilter) return false;
+      if (!searchText) return true;
+
+      const blob = `${row.operation} ${row.thisUnit} ${row.thatUnit} ${row.thisMeasurementType} ${row.thatMeasurementType}`.toLowerCase();
+      return blob.includes(searchText);
+    });
+  }
+
+  get usersForList(): Omit<UserRecord, 'password'>[] {
+    if (this.isAdmin) return this.users;
+    const currentId = this.currentUser?.id;
+    return this.users.filter((user) => user.id === currentId);
   }
 
   get isConvert(): boolean {
@@ -221,6 +274,8 @@ export class AppComponent implements OnInit {
         'Open Operations',
         () => {
           this.isLoggedIn = true;
+          this.activeSection = 'operations';
+          this.refreshAppData();
           this.addToast('Sign in successful.', 'success');
         }
       );
@@ -245,6 +300,8 @@ export class AppComponent implements OnInit {
         'Start Measuring',
         () => {
           this.isLoggedIn = true;
+          this.activeSection = 'operations';
+          this.refreshAppData();
           this.addToast('Registration successful.', 'success');
         }
       );
@@ -282,6 +339,7 @@ export class AppComponent implements OnInit {
       this.resultIsError = rec.error;
       this.resultValue = this.formatResult(rec, OP_META[this.activeOperation].id);
       this.resultMeta = `${rec.thisValue} ${rec.thisUnit} (${rec.thisMeasurementType}) -> ${rec.thatValue} ${rec.thatUnit} (${rec.thatMeasurementType})`;
+      this.refreshAppData();
       this.addToast(rec.error ? rec.errorMessage || 'Operation returned an error.' : 'Operation complete.', rec.error ? 'error' : 'success');
     } catch (error) {
       this.resultVisible = true;
@@ -390,6 +448,18 @@ export class AppComponent implements OnInit {
 
   private writeStore(store: MockStore): void {
     localStorage.setItem(MOCK_STORE_KEY, JSON.stringify(store));
+  }
+
+  private refreshAppData(): void {
+    const store = this.readStore();
+
+    this.historyRows = store.measurements
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    this.users = store.users
+      .map(({ password, ...safe }) => safe)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   private loginUser(email: string, password: string): AuthSession {
@@ -564,6 +634,30 @@ export class AppComponent implements OnInit {
 
     const unit = result.resultUnit ? ` ${result.resultUnit}` : '';
     return `${result.resultValue}${unit}`;
+  }
+
+  historyResult(row: MeasurementRecord): string {
+    if (row.error) return row.errorMessage || 'Operation failed.';
+    if (row.operation === 'COMPARE') {
+      return String(row.resultValue).toUpperCase() === 'TRUE' ? 'EQUAL' : 'NOT EQUAL';
+    }
+
+    const unit = row.resultUnit ? ` ${row.resultUnit}` : '';
+    return `${row.resultValue}${unit}`;
+  }
+
+  operationBadgeClass(operation: string): string {
+    if (operation === 'COMPARE') return 'badge-blue';
+    if (operation === 'ADD' || operation === 'CONVERT') return 'badge-accent';
+    if (operation === 'SUBTRACT') return 'badge-warning';
+    if (operation === 'DIVIDE') return 'badge-success';
+    return 'badge-error';
+  }
+
+  formatDate(value: string): string {
+    if (!value) return '-';
+    const parsed = new Date(value);
+    return `${parsed.toLocaleDateString()} ${parsed.toLocaleTimeString()}`;
   }
 
   private showSuccessPopup(title: string, message: string, buttonText: string, onClose: () => void): void {

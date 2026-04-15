@@ -386,6 +386,60 @@ textarea:focus {
   margin-bottom: 0.85rem;
 }
 
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.stat-card {
+  padding: 1rem;
+}
+
+.stat-num {
+  font: 800 1.5rem 'JetBrains Mono', monospace;
+  margin-top: 0.3rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+th,
+td {
+  padding: 0.74rem 0.65rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+  font-size: 0.92rem;
+}
+
+th {
+  color: var(--text2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+tr.error-row {
+  background: rgba(240, 64, 64, 0.08);
+}
+
+.empty-state {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+  background: var(--card);
+}
+
 .mono {
   font-family: 'JetBrains Mono', monospace;
 }
@@ -753,6 +807,7 @@ textarea:focus {
 }
 
 @media (max-width: 760px) {
+  .grid-4,
   .split-grid {
     grid-template-columns: 1fr;
   }

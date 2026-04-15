@@ -79,7 +79,9 @@
         <span class="brand-text">Quantity Measurement App</span>
       </a>
       <div class="nav-links">
-        <a class="nav-link active" href="javascript:void(0)">Operations</a>
+        <a class="nav-link" [class.active]="activeSection === 'operations'" href="javascript:void(0)" (click)="setSection('operations')">Operations</a>
+        <a class="nav-link" [class.active]="activeSection === 'history'" href="javascript:void(0)" (click)="setSection('history')">History</a>
+        <a class="nav-link" [class.active]="activeSection === 'users'" href="javascript:void(0)" (click)="setSection('users')">Users</a>
       </div>
       <div class="nav-actions">
         <button class="btn btn-ghost theme-icon-btn" type="button" aria-label="Toggle theme" title="Toggle theme" (click)="toggleTheme()">
@@ -95,11 +97,32 @@
   <main class="page-wrap">
     <section class="section-title reveal d1">
       <div>
-        <h1>{{ welcomeText }}</h1>
+        <h1>{{ activeSection === 'operations' ? welcomeText : activeSection === 'history' ? 'Operation History' : 'Users' }}</h1>
+        <p *ngIf="activeSection === 'history'">Track all operations with filters and search.</p>
+        <p *ngIf="activeSection === 'users'">User directory{{ isAdmin ? ' (Admin View)' : '' }}.</p>
       </div>
     </section>
 
-    <section class="card reveal d2" style="padding:1rem;">
+    <section class="grid-4 reveal d2" *ngIf="activeSection !== 'users'">
+      <article class="card stat-card">
+        <span class="badge badge-accent">Total Operations</span>
+        <div class="stat-num">{{ totalOperations }}</div>
+      </article>
+      <article class="card stat-card">
+        <span class="badge badge-blue">Current User</span>
+        <div class="stat-num" style="font-size:1.05rem; margin-top:0.62rem;">{{ currentUsername }}</div>
+      </article>
+      <article class="card stat-card">
+        <span class="badge badge-warning">Errors</span>
+        <div class="stat-num">{{ totalErrors }}</div>
+      </article>
+      <article class="card stat-card">
+        <span class="badge badge-success">Registered Users</span>
+        <div class="stat-num">{{ users.length }}</div>
+      </article>
+    </section>
+
+    <section class="card reveal d2" style="padding:1rem; margin-top:0.9rem;" *ngIf="activeSection === 'operations'">
       <div class="tabs" style="margin-bottom:1rem;">
         <button
           *ngFor="let op of operationTabs"
@@ -166,6 +189,136 @@
       <div class="result-box" [ngClass]="{ show: resultVisible, error: resultVisible && resultIsError, success: resultVisible && !resultIsError }">
         <div class="result-value">{{ resultValue }}</div>
         <div class="mono muted" style="margin-top:0.35rem;">{{ resultMeta }}</div>
+      </div>
+    </section>
+
+    <section class="card reveal d2" style="padding:1rem; margin-top:0.9rem;" *ngIf="activeSection === 'history'">
+      <div class="split-grid">
+        <div class="field">
+          <label for="historyFilter">Filter</label>
+          <select id="historyFilter" name="historyFilter" [(ngModel)]="historyFilter">
+            <option value="ALL">All Operations</option>
+            <option value="ERRORS">Errors Only</option>
+            <option value="COMPARE">Compare</option>
+            <option value="ADD">Add</option>
+            <option value="SUBTRACT">Subtract</option>
+            <option value="DIVIDE">Divide</option>
+            <option value="CONVERT">Convert</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="historySearch">Search</label>
+          <input id="historySearch" name="historySearch" type="text" [(ngModel)]="historySearch" placeholder="Type, unit, operation" />
+        </div>
+      </div>
+
+      <p class="muted" style="margin:0.95rem 0 0.5rem;">Showing {{ filteredHistoryRows.length }} of {{ historyRows.length }} operations</p>
+
+      <div class="table-wrap" *ngIf="filteredHistoryRows.length > 0">
+        <table>
+          <thead>
+            <tr>
+              <th>Operation</th>
+              <th>Input</th>
+              <th>Result</th>
+              <th>Status</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of filteredHistoryRows" [class.error-row]="row.error">
+              <td><span class="badge" [ngClass]="operationBadgeClass(row.operation)">{{ row.operation }}</span></td>
+              <td class="mono">{{ row.thisValue }} {{ row.thisUnit }} | {{ row.thatValue }} {{ row.thatUnit }}</td>
+              <td class="mono">{{ historyResult(row) }}</td>
+              <td>
+                <span *ngIf="row.error" class="badge badge-error">Error</span>
+                <span *ngIf="!row.error" class="badge badge-success">OK</span>
+              </td>
+              <td class="muted mono">{{ formatDate(row.createdAt) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="empty-state" *ngIf="filteredHistoryRows.length === 0">
+        <h3>No matching operations</h3>
+        <p>Try changing your filter or perform a new operation.</p>
+      </div>
+    </section>
+
+    <section class="card reveal d2" style="padding:1rem; margin-top:0.9rem;" *ngIf="activeSection === 'users'">
+      <div class="section-title" style="margin-bottom:0.7rem;">
+        <h3>{{ isAdmin ? 'All Users' : 'Your Account' }}</h3>
+        <span class="badge" [ngClass]="isAdmin ? 'badge-accent' : 'badge-blue'">{{ isAdmin ? 'ADMIN ACCESS' : 'USER ACCESS' }}</span>
+      </div>
+
+      <div class="table-wrap" *ngIf="usersForList.length > 0">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Roles</th>
+              <th>Provider</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let user of usersForList; let idx = index">
+              <td class="mono">{{ idx + 1 }}</td>
+              <td>
+                <div style="display:flex; gap:0.55rem; align-items:center;">
+                  <span class="mini-avatar">{{ user.username.charAt(0).toUpperCase() }}</span>
+                  <div>
+                    <div>{{ user.fullName }}</div>
+                    <div class="muted mono">@{{ user.username }}</div>
+                  </div>
+                </div>
+              </td>
+              <td>{{ user.email }}</td>
+              <td>
+                <span *ngFor="let role of user.roles" class="badge badge-accent" style="margin-right:0.3rem;">{{ role }}</span>
+              </td>
+              <td>
+                <span class="badge" [ngClass]="user.provider === 'GOOGLE' ? 'badge-blue' : 'badge-warning'">{{ user.provider }}</span>
+              </td>
+              <td class="muted mono">{{ formatDate(user.createdAt) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="empty-state" *ngIf="usersForList.length === 0">
+        <h3>No users found</h3>
+        <p>Register a new account to populate this section.</p>
+      </div>
+    </section>
+
+    <section class="card reveal d2" style="padding:1rem; margin-top:0.9rem;" *ngIf="activeSection === 'operations' && recentOperations.length > 0">
+      <div class="section-title" style="margin-bottom:0.7rem;">
+        <h3>Recent Operations</h3>
+        <button class="btn btn-ghost" type="button" (click)="setSection('history')">Open Full History</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Operation</th>
+              <th>Input</th>
+              <th>Result</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of recentOperations">
+              <td><span class="badge" [ngClass]="operationBadgeClass(row.operation)">{{ row.operation }}</span></td>
+              <td class="mono">{{ row.thisValue }} {{ row.thisUnit }} | {{ row.thatValue }} {{ row.thatUnit }}</td>
+              <td class="mono">{{ historyResult(row) }}</td>
+              <td class="muted mono">{{ formatDate(row.createdAt) }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
   </main>
