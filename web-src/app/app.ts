@@ -1,6 +1,7 @@
 import { NgClass, NgFor, NgIf } from '@angular/common';
-import { Component, OnInit, ViewEncapsulation } from '@angular/core';
+import { Component, OnInit, ViewEncapsulation, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { BackendApiService, type AuthSession as ApiAuthSession, type QuantityInputDTO, type QuantityMeasurementDTO, type UserRecord as ApiUserRecord } from './backend-api.service';
 
 type MeasurementType = 'LengthUnit' | 'WeightUnit' | 'VolumeUnit' | 'TemperatureUnit';
 type Operation = 'compare' | 'add' | 'subtract' | 'divide' | 'convert';
@@ -9,6 +10,7 @@ type AppSection = 'operations' | 'history' | 'users';
 
 interface AuthSession {
   token: string;
+  type?: string;
   id: number;
   username: string;
   email: string;
@@ -26,7 +28,7 @@ interface UserRecord {
   provider: string;
   roles: string[];
   createdAt: string;
-  password: string;
+  password?: string;
 }
 
 interface MeasurementRecord {
@@ -90,6 +92,7 @@ const THEME_VERSION = '2';
 })
 export class AppComponent implements OnInit {
   readonly OP_UI = OP_META;
+  private readonly api = inject(BackendApiService);
 
   themeMode: ThemeMode = 'light';
   isLoggedIn = false;
@@ -150,23 +153,22 @@ export class AppComponent implements OnInit {
   historyRows: MeasurementRecord[] = [];
   users: Omit<UserRecord, 'password'>[] = [];
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
     this.initTheme();
-    this.currentUser = this.getAuth();
+    this.currentUser = this.api.getAuth();
     this.isLoggedIn = Boolean(this.currentUser?.token);
 
     this.syncUnits();
-    this.seedStore();
 
     if (this.isLoggedIn) {
-      this.refreshAppData();
+      await this.bootstrapAuthenticatedState();
       this.addToast('Welcome back.', 'success');
     }
   }
 
   setSection(section: AppSection): void {
     this.activeSection = section;
-    this.refreshAppData();
+    void this.refreshAppData();
   }
 
   setAuthTab(tab: 'signin' | 'register'): void {
@@ -265,8 +267,11 @@ export class AppComponent implements OnInit {
     this.signInLoading = true;
 
     try {
-      const session = this.loginUser(this.signInModel.email.trim(), this.signInModel.password);
-      this.saveAuth(session, this.signInModel.rememberMe);
+      const session = await this.api.login({
+        email: this.signInModel.email.trim(),
+        password: this.signInModel.password
+      });
+      this.api.saveAuth(session as ApiAuthSession, this.signInModel.rememberMe);
       this.currentUser = session;
       this.showSuccessPopup(
         'Welcome back',
@@ -275,7 +280,7 @@ export class AppComponent implements OnInit {
         () => {
           this.isLoggedIn = true;
           this.activeSection = 'operations';
-          this.refreshAppData();
+          void this.bootstrapAuthenticatedState();
           this.addToast('Sign in successful.', 'success');
         }
       );
@@ -291,8 +296,15 @@ export class AppComponent implements OnInit {
     this.registerLoading = true;
 
     try {
-      const session = this.registerUser(this.registerModel.fullName, this.registerModel.email.trim(), this.registerModel.password);
-      this.saveAuth(session, true);
+      const email = this.registerModel.email.trim();
+      const username = this.deriveUsername(email);
+      const session = await this.api.register({
+        fullName: this.registerModel.fullName.trim() || username,
+        username,
+        email,
+        password: this.registerModel.password
+      });
+      this.api.saveAuth(session as ApiAuthSession, true);
       this.currentUser = session;
       this.showSuccessPopup(
         'Account created',
@@ -301,7 +313,7 @@ export class AppComponent implements OnInit {
         () => {
           this.isLoggedIn = true;
           this.activeSection = 'operations';
-          this.refreshAppData();
+          void this.bootstrapAuthenticatedState();
           this.addToast('Registration successful.', 'success');
         }
       );
@@ -313,8 +325,7 @@ export class AppComponent implements OnInit {
   }
 
   logout(): void {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    this.api.clearAuth();
     this.currentUser = null;
     this.isLoggedIn = false;
     this.authTab = 'signin';
@@ -334,12 +345,13 @@ export class AppComponent implements OnInit {
         throw new Error('Enter a valid second value.');
       }
 
-      const rec = this.calculateAndStore();
+      const payload = this.buildQuantityInput();
+      const rec = await this.api.calculate(this.activeOperation, payload);
       this.resultVisible = true;
       this.resultIsError = rec.error;
       this.resultValue = this.formatResult(rec, OP_META[this.activeOperation].id);
       this.resultMeta = `${rec.thisValue} ${rec.thisUnit} (${rec.thisMeasurementType}) -> ${rec.thatValue} ${rec.thatUnit} (${rec.thatMeasurementType})`;
-      this.refreshAppData();
+      await this.refreshAppData();
       this.addToast(rec.error ? rec.errorMessage || 'Operation returned an error.' : 'Operation complete.', rec.error ? 'error' : 'success');
     } catch (error) {
       this.resultVisible = true;
@@ -389,111 +401,62 @@ export class AppComponent implements OnInit {
     this.onSecondTypeChange();
   }
 
-  private getAuth(): AuthSession | null {
+  private async bootstrapAuthenticatedState(): Promise<void> {
+    if (!this.currentUser) return;
+
     try {
-      const fromSession = sessionStorage.getItem(AUTH_STORAGE_KEY);
-      if (fromSession) return JSON.parse(fromSession) as AuthSession;
-      const fromLocal = localStorage.getItem(AUTH_STORAGE_KEY);
-      return fromLocal ? (JSON.parse(fromLocal) as AuthSession) : null;
-    } catch {
-      return null;
+      const profile = await this.api.me();
+      this.currentUser = {
+        ...this.currentUser,
+        id: profile.id,
+        username: profile.username,
+        email: profile.email,
+        fullName: profile.fullName,
+        roles: profile.roles.map((role) => (typeof role === 'string' ? role : role.name)),
+        provider: profile.provider,
+        createdAt: profile.createdAt
+      };
+
+      const stored = this.api.getAuth();
+      if (stored) {
+        this.api.saveAuth({ ...stored, ...this.currentUser }, Boolean(sessionStorage.getItem(AUTH_STORAGE_KEY)));
+      }
+
+      await this.refreshAppData();
+    } catch (error) {
+      this.addToast(this.errorMessage(error), 'error');
+      this.logout();
     }
   }
 
-  private saveAuth(session: AuthSession, remember: boolean): void {
-    const serialized = JSON.stringify(session);
-    if (remember) {
-      localStorage.setItem(AUTH_STORAGE_KEY, serialized);
-      sessionStorage.removeItem(AUTH_STORAGE_KEY);
-      return;
+  private async refreshAppData(): Promise<void> {
+    if (!this.currentUser) return;
+
+    try {
+      const opRows = await Promise.all(this.operationTabs.map((operation) => this.api.operationHistory(operation)));
+      const errored = await this.api.erroredHistory();
+      const erroredIds = new Set(errored.map((row) => row.id));
+
+      this.historyRows = opRows
+        .flat()
+        .map((row) => ({
+          ...row,
+          error: row.error || erroredIds.has(row.id)
+        }))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      if (this.isAdmin) {
+        const users = await this.api.allUsers();
+        this.users = users
+          .map((user) => this.normalizeUser(user))
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      } else {
+        const profile = await this.api.me();
+        this.users = [this.normalizeUser(profile)];
+      }
+    } catch (error) {
+      this.addToast(this.errorMessage(error), 'error');
     }
-
-    sessionStorage.setItem(AUTH_STORAGE_KEY, serialized);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-  }
-
-  private seedStore(): void {
-    if (localStorage.getItem(MOCK_STORE_KEY)) return;
-
-    const seed: MockStore = {
-      nextUserId: 2,
-      nextMeasurementId: 17,
-      users: [
-        {
-          id: 1,
-          username: 'admin',
-          email: 'admin@quantimeasure.app',
-          fullName: 'Alicia Admin',
-          provider: 'LOCAL',
-          roles: ['ROLE_ADMIN', 'ROLE_USER'],
-          createdAt: '2026-01-08T09:15:00',
-          password: 'Admin@123'
-        }
-      ],
-      measurements: []
-    };
-
-    localStorage.setItem(MOCK_STORE_KEY, JSON.stringify(seed));
-  }
-
-  private readStore(): MockStore {
-    const raw = localStorage.getItem(MOCK_STORE_KEY);
-    if (!raw) {
-      this.seedStore();
-      return this.readStore();
-    }
-
-    return JSON.parse(raw) as MockStore;
-  }
-
-  private writeStore(store: MockStore): void {
-    localStorage.setItem(MOCK_STORE_KEY, JSON.stringify(store));
-  }
-
-  private refreshAppData(): void {
-    const store = this.readStore();
-
-    this.historyRows = store.measurements
-      .slice()
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    this.users = store.users
-      .map(({ password, ...safe }) => safe)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
-
-  private loginUser(email: string, password: string): AuthSession {
-    if (!email || !password) throw new Error('Email and password are required.');
-
-    const store = this.readStore();
-    const user = store.users.find((u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    if (!user) throw new Error('Invalid email or password.');
-
-    return this.authFromUser(user);
-  }
-
-  private registerUser(fullName: string, email: string, password: string): AuthSession {
-    if (!email || !password) throw new Error('Email and password are required.');
-
-    const store = this.readStore();
-    const exists = store.users.some((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (exists) throw new Error('User already exists with this email.');
-
-    const username = this.deriveUsername(email);
-    const user: UserRecord = {
-      id: store.nextUserId++,
-      username,
-      email: email.toLowerCase(),
-      fullName: fullName.trim() || username,
-      provider: 'LOCAL',
-      roles: ['ROLE_USER'],
-      createdAt: new Date().toISOString(),
-      password
-    };
-
-    store.users.push(user);
-    this.writeStore(store);
-    return this.authFromUser(user);
   }
 
   private deriveUsername(email: string): string {
@@ -501,78 +464,38 @@ export class AppComponent implements OnInit {
     return local.toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 24) || 'user';
   }
 
-  private authFromUser(user: UserRecord): AuthSession {
+  private buildQuantityInput(): QuantityInputDTO {
+    const firstValue = Number(this.firstValue);
+    const secondValue = this.isConvert ? Number(this.firstValue ?? 0) : Number(this.secondValue);
+
     return {
-      token: `mock-token-${user.id}-${Date.now()}`,
+      thisQuantityDTO: {
+        value: firstValue,
+        unit: this.firstUnit,
+        measurementType: this.firstType
+      },
+      thatQuantityDTO: {
+        value: secondValue,
+        unit: this.secondUnit,
+        measurementType: this.secondType
+      },
+      targetUnit: this.isConvert ? this.secondUnit : undefined
+    };
+  }
+
+  private normalizeUser(user: ApiUserRecord): Omit<UserRecord, 'password'> {
+    const roles = (user.roles || []).map((role) => (typeof role === 'string' ? role : role.name));
+    const provider = String(user.provider || 'LOCAL').toUpperCase();
+
+    return {
       id: user.id,
       username: user.username,
       email: user.email,
       fullName: user.fullName,
-      roles: user.roles,
-      provider: user.provider,
-      createdAt: user.createdAt
+      provider,
+      roles,
+      createdAt: user.createdAt || new Date().toISOString()
     };
-  }
-
-  private calculateAndStore(): MeasurementRecord {
-    const store = this.readStore();
-
-    const q1Value = Number(this.firstValue);
-    const q2Value = this.isConvert ? 0 : Number(this.secondValue);
-
-    const base1 = this.convertToBase(this.firstType, q1Value, this.firstUnit);
-    const base2 = this.convertToBase(this.secondType, q2Value, this.secondUnit);
-
-    const sameType = this.firstType === this.secondType;
-    let resultValue = '';
-    let resultUnit = this.secondUnit;
-    let error = false;
-    let errorMessage: string | null = null;
-
-    const opId = OP_META[this.activeOperation].id;
-
-    if (!sameType) {
-      error = true;
-      errorMessage = 'Measurement types must match.';
-    } else if (opId === 'DIVIDE' && Number(base2) === 0) {
-      error = true;
-      errorMessage = 'Cannot divide by zero';
-    } else if (opId === 'COMPARE') {
-      resultValue = String(Math.abs(base1 - base2) < 1e-9);
-      resultUnit = '';
-    } else if (opId === 'ADD') {
-      resultValue = String(this.convertFromBase(this.firstType, base1 + base2, this.firstUnit));
-      resultUnit = this.firstUnit;
-    } else if (opId === 'SUBTRACT') {
-      resultValue = String(this.convertFromBase(this.firstType, base1 - base2, this.firstUnit));
-      resultUnit = this.firstUnit;
-    } else if (opId === 'DIVIDE') {
-      resultValue = String(base1 / base2);
-      resultUnit = '';
-    } else if (opId === 'CONVERT') {
-      resultValue = String(this.convertFromBase(this.firstType, base1, this.secondUnit));
-      resultUnit = this.secondUnit;
-    }
-
-    const rec: MeasurementRecord = {
-      id: store.nextMeasurementId++,
-      thisValue: q1Value,
-      thisUnit: this.firstUnit,
-      thisMeasurementType: this.firstType,
-      thatValue: q2Value,
-      thatUnit: this.secondUnit,
-      thatMeasurementType: this.secondType,
-      operation: opId,
-      resultValue,
-      resultUnit,
-      errorMessage,
-      error,
-      createdAt: new Date().toISOString()
-    };
-
-    store.measurements.push(rec);
-    this.writeStore(store);
-    return rec;
   }
 
   private convertToBase(type: MeasurementType, value: number, unit: string): number {
