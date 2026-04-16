@@ -62,7 +62,7 @@ interface ToastItem {
 }
 
 const UNIT_MAP: Record<MeasurementType, string[]> = {
-  LengthUnit: ['FEET', 'INCHES', 'YARD'],
+  LengthUnit: ['FEET', 'INCHES', 'YARDS'],
   WeightUnit: ['GRAM', 'KILOGRAM', 'TONNE'],
   VolumeUnit: ['MILLILITER', 'LITER', 'KILOLITER', 'GALLON'],
   TemperatureUnit: ['CELSIUS', 'FAHRENHEIT', 'KELVIN']
@@ -155,8 +155,21 @@ export class AppComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     this.initTheme();
+    const consumedOAuthCallback = await this.consumeOAuthCallbackIfPresent();
+
+    if (consumedOAuthCallback) {
+      return;
+    }
+
     this.currentUser = this.api.getAuth();
     this.isLoggedIn = Boolean(this.currentUser?.token);
+
+    if (!this.isLoggedIn) {
+      const recovered = await this.bootstrapSessionFromBackend();
+      if (recovered) {
+        return;
+      }
+    }
 
     this.syncUnits();
 
@@ -175,6 +188,10 @@ export class AppComponent implements OnInit {
     this.authTab = tab;
     this.signInError = '';
     this.registerError = '';
+  }
+
+  startGoogleSignIn(): void {
+    void this.startGoogleSignInWithPopup();
   }
 
   toggleTheme(): void {
@@ -425,7 +442,201 @@ export class AppComponent implements OnInit {
       await this.refreshAppData();
     } catch (error) {
       this.addToast(this.errorMessage(error), 'error');
-      this.logout();
+      this.isLoggedIn = true;
+      this.activeSection = 'operations';
+    }
+  }
+
+  private async consumeOAuthCallbackIfPresent(): Promise<boolean> {
+    const query = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash);
+    const token =
+      query.get('token') ||
+      query.get('access_token') ||
+      query.get('jwt') ||
+      hash.get('token') ||
+      hash.get('access_token') ||
+      hash.get('jwt');
+
+    if (!token) return false;
+
+    const parseNumber = (value: string | null, fallback: number): number => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const rolesRaw = query.get('roles') || hash.get('roles') || 'ROLE_USER';
+    const roles = rolesRaw
+      .split(',')
+      .map((role) => role.trim())
+      .filter((role) => role.length > 0);
+
+    const session: ApiAuthSession = {
+      token,
+      type: query.get('type') || hash.get('type') || 'Bearer',
+      id: parseNumber(query.get('id') || hash.get('id'), 0),
+      username: query.get('username') || hash.get('username') || 'google_user',
+      email: query.get('email') || hash.get('email') || '',
+      fullName: query.get('fullName') || hash.get('fullName') || query.get('name') || hash.get('name') || 'Google User',
+      roles
+    };
+
+    if (window.opener && window.opener !== window) {
+      try {
+        window.opener.postMessage({ type: 'QM_GOOGLE_AUTH', session }, window.location.origin);
+      } catch {
+        // Ignore cross-window communication failures.
+      }
+      window.close();
+      return true;
+    }
+
+    this.api.saveAuth(session, true);
+    this.currentUser = session;
+    this.isLoggedIn = true;
+    this.activeSection = 'operations';
+
+    const cleanUrl = `${window.location.origin}${window.location.pathname}`;
+    window.history.replaceState({}, document.title, cleanUrl);
+
+    await this.bootstrapAuthenticatedState();
+    this.addToast('Google sign in successful.', 'success');
+    return true;
+  }
+
+  private async startGoogleSignInWithPopup(): Promise<void> {
+    const targetUrl = this.api.googleAuthUrl();
+    const popup = window.open(targetUrl, 'qm_google_auth', 'width=520,height=700,menubar=no,toolbar=no,location=yes,resizable=yes,scrollbars=yes');
+
+    if (!popup) {
+      this.addToast('Popup blocked by browser. Allow popups and try again.', 'warning');
+      window.location.assign(targetUrl);
+      return;
+    }
+
+    let completed = false;
+
+    const finalizeLogin = async (session: ApiAuthSession): Promise<void> => {
+      this.api.saveAuth(session, true);
+      this.currentUser = session;
+      this.isLoggedIn = true;
+      this.activeSection = 'operations';
+      await this.bootstrapAuthenticatedState();
+      this.addToast('Google sign in successful.', 'success');
+    };
+
+    const cleanup = (): void => {
+      window.clearInterval(timerId);
+      window.removeEventListener('message', onMessage);
+    };
+
+    const onMessage = (event: MessageEvent): void => {
+      const data = event.data as { type?: string; session?: ApiAuthSession };
+      if (event.origin !== window.location.origin) return;
+      if (!data || data.type !== 'QM_GOOGLE_AUTH' || !data.session?.token) return;
+
+      completed = true;
+      cleanup();
+      if (!popup.closed) popup.close();
+      void finalizeLogin(data.session);
+    };
+
+    window.addEventListener('message', onMessage);
+
+    const timerId = window.setInterval(() => {
+      void (async () => {
+        if (completed) return;
+
+        if (popup.closed) {
+          cleanup();
+          return;
+        }
+
+        try {
+          const href = popup.location.href;
+          if (!href.startsWith(window.location.origin)) {
+            return;
+          }
+
+          const query = new URLSearchParams(popup.location.search);
+          const hash = new URLSearchParams(popup.location.hash.startsWith('#') ? popup.location.hash.slice(1) : popup.location.hash);
+          const callbackToken = query.get('token') || query.get('access_token') || query.get('jwt') || hash.get('token') || hash.get('access_token') || hash.get('jwt');
+
+          if (callbackToken) {
+            completed = true;
+            cleanup();
+            popup.close();
+
+            const session: ApiAuthSession = {
+              token: callbackToken,
+              type: query.get('type') || hash.get('type') || 'Bearer',
+              id: Number(query.get('id') || hash.get('id') || '0') || 0,
+              username: query.get('username') || hash.get('username') || 'google_user',
+              email: query.get('email') || hash.get('email') || '',
+              fullName: query.get('fullName') || hash.get('fullName') || query.get('name') || hash.get('name') || 'Google User',
+              roles: (query.get('roles') || hash.get('roles') || 'ROLE_USER').split(',').map((role) => role.trim()).filter((role) => role)
+            };
+
+            await finalizeLogin(session);
+            return;
+          }
+
+          const rawText = (popup.document.body?.innerText || '').trim();
+          if (!rawText || rawText[0] !== '{') {
+            return;
+          }
+
+          const payload = JSON.parse(rawText) as { token?: string; type?: string; email?: string };
+          if (!payload.token) {
+            return;
+          }
+
+          completed = true;
+          cleanup();
+          popup.close();
+
+          const email = payload.email || '';
+          const username = email ? this.deriveUsername(email) : 'google_user';
+          const session: ApiAuthSession = {
+            token: payload.token,
+            type: payload.type || 'Bearer',
+            id: 0,
+            username,
+            email,
+            fullName: username,
+            roles: ['ROLE_USER']
+          };
+
+          await finalizeLogin(session);
+        } catch {
+          // Ignore cross-origin access errors while popup is on Google domains.
+        }
+      })();
+    }, 450);
+  }
+
+  private async bootstrapSessionFromBackend(): Promise<boolean> {
+    try {
+      const profile = await this.api.me();
+      const session: ApiAuthSession = {
+        token: 'cookie-session',
+        type: 'Cookie',
+        id: profile.id,
+        username: profile.username,
+        email: profile.email,
+        fullName: profile.fullName,
+        roles: (profile.roles || []).map((role) => (typeof role === 'string' ? role : role.name))
+      };
+
+      this.api.saveAuth(session, true);
+      this.currentUser = session;
+      this.isLoggedIn = true;
+      this.activeSection = 'operations';
+      this.syncUnits();
+      await this.bootstrapAuthenticatedState();
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -501,7 +712,7 @@ export class AppComponent implements OnInit {
   private convertToBase(type: MeasurementType, value: number, unit: string): number {
     if (type === 'LengthUnit') {
       if (unit === 'FEET') return value * 12;
-      if (unit === 'YARD') return value * 36;
+      if (unit === 'YARDS') return value * 36;
       return value;
     }
 
@@ -526,7 +737,7 @@ export class AppComponent implements OnInit {
   private convertFromBase(type: MeasurementType, value: number, unit: string): number {
     if (type === 'LengthUnit') {
       if (unit === 'FEET') return value / 12;
-      if (unit === 'YARD') return value / 36;
+      if (unit === 'YARDS') return value / 36;
       return value;
     }
 

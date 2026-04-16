@@ -1,6 +1,8 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { environment } from '../environments/environment';
 
 type MeasurementType = 'LengthUnit' | 'WeightUnit' | 'VolumeUnit' | 'TemperatureUnit';
 type Operation = 'compare' | 'add' | 'subtract' | 'divide' | 'convert';
@@ -77,18 +79,48 @@ interface ApiErrorBody {
 
 @Injectable({ providedIn: 'root' })
 export class BackendApiService {
-  private readonly baseUrl = 'http://localhost:8080';
+  private readonly baseUrl = environment.apiBaseUrl;
   private readonly authKey = 'qm_auth';
   private readonly sessionAuthKey = 'qm_auth';
 
   constructor(private readonly http: HttpClient) {}
 
+  async isBackendAvailable(): Promise<boolean> {
+    const probePaths = ['/api-docs', '/v3/api-docs'];
+
+    for (const path of probePaths) {
+      try {
+        await firstValueFrom(
+          this.http.get(`${this.baseUrl}${path}`, {
+            observe: 'response',
+            withCredentials: true
+          })
+        );
+        return true;
+      } catch (error) {
+        const response = error as HttpErrorResponse;
+        if (response && typeof response.status === 'number' && response.status > 0) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  async canReachBackend(): Promise<void> {
+    const reachable = await this.isBackendAvailable();
+    if (!reachable) {
+      throw new Error('Backend is not reachable on port 8080. Start backend first, then retry.');
+    }
+  }
+
   async register(payload: RegisterRequest): Promise<AuthSession> {
-    return this.request<AuthSession>('POST', '/auth/register', payload);
+    return this.request<AuthSession>('POST', '/auth/register', payload, false);
   }
 
   async login(payload: LoginRequest): Promise<AuthSession> {
-    return this.request<AuthSession>('POST', '/auth/login', payload);
+    return this.request<AuthSession>('POST', '/auth/login', payload, false);
   }
 
   async me(): Promise<UserRecord> {
@@ -119,6 +151,10 @@ export class BackendApiService {
     return this.request<QuantityMeasurementDTO>('POST', `/api/v1/quantities/${operation}`, payload);
   }
 
+  googleAuthUrl(): string {
+    return `${this.baseUrl}/oauth2/authorization/google`;
+  }
+
   saveAuth(session: AuthSession, remember: boolean): void {
     const serialized = JSON.stringify(session);
     if (remember) {
@@ -147,11 +183,12 @@ export class BackendApiService {
     sessionStorage.removeItem(this.sessionAuthKey);
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers = this.buildHeaders();
+  private async request<T>(method: string, path: string, body?: unknown, authRequired = true): Promise<T> {
+    const headers = this.buildHeaders(authRequired);
     const options = {
       headers,
       body: body ?? undefined,
+      withCredentials: true,
       responseType: 'json' as const,
       observe: 'body' as const
     };
@@ -163,13 +200,21 @@ export class BackendApiService {
     }
   }
 
-  private buildHeaders(): HttpHeaders {
-    const session = this.getAuth();
-    const token = session?.token || '';
-    return new HttpHeaders({
-      'Content-Type': 'application/json',
-      Authorization: token ? `Bearer ${token}` : ''
-    });
+  private buildHeaders(authRequired: boolean): HttpHeaders {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    if (authRequired) {
+      const session = this.getAuth();
+      const token = session?.token || '';
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+
+    return new HttpHeaders(headers);
   }
 
   private readErrorMessage(error: unknown): string {
@@ -186,7 +231,14 @@ export class BackendApiService {
     }
 
     if (response?.message) return response.message;
-    if (response?.status === 0) return 'Unable to reach backend. Make sure Spring Boot is running on http://localhost:8080.';
+
+    if (response?.status && response.status >= 500) {
+      return 'Backend responded with a server error. Check Spring Boot logs and make sure the backend is running on port 8080.';
+    }
+
+    if (response?.status === 0) {
+      return 'Unable to reach backend. Check backend is running on http://localhost:8080 and CORS/proxy is configured for http://localhost:4200.';
+    }
 
     return 'Request failed.';
   }
